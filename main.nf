@@ -10,8 +10,10 @@ include printHelp from './modules/help.nf'
 include {articNcovNanopore} from './workflows/articNcovNanoporeExt.nf'
 include {ncovIllumina} from './workflows/illuminaNcovExt.nf'
 include {ncovIlluminaCram} from './workflows/illuminaNcovExt.nf'
-include {songScoreDownload} from './workflows/song-score-download'
+include {songScoreDownload as dnld} from './workflows/song-score-download'
 include {songScoreUpload} from './workflows/song-score-upload'
+include {getSampleId; prepareFastqPair} from './modules/utils'
+
 
 if (params.help){
     printHelp()
@@ -74,12 +76,21 @@ if ( ! params.prefix ) {
 // main workflow
 workflow {
    // TODO: download from SONG/SCORE
+   dnld(params.study_id, params.analysis_id)
+   analysis_metadata = dnld.out.song_analysis
+   sequencing_files = dnld.out.files
+
+   getSampleId(analysis_metadata)
+   prepareFastqPair(getSampleId.out, sequencing_files)
 
    if ( params.illumina ) {
        if (params.cram) {
            Channel.fromPath( "${params.directory}/**.cram" )
                   .map { file -> tuple(file.baseName, file) }
                   .set{ ch_cramFiles }
+       }
+       else if (params.analysis_id) {
+           ch_filePairs = prepareFastqPair.out
        }
        else {
 	   Channel.fromFilePairs( params.fastqSearchPath, flat: true)
