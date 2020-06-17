@@ -7,9 +7,13 @@ nextflow.preview.dsl = 2
 include printHelp from './modules/help.nf'
 
 // import subworkflows
-include {articNcovNanopore} from './workflows/articNcovNanopore.nf' 
-include {ncovIllumina} from './workflows/illuminaNcov.nf'
-include {ncovIlluminaCram} from './workflows/illuminaNcov.nf'
+include {articNcovNanopore} from './workflows/articNcovNanoporeExt.nf'
+include {ncovIllumina} from './workflows/illuminaNcovExt.nf'
+include {ncovIlluminaCram} from './workflows/illuminaNcovExt.nf'
+include {songScoreDownload as dnld} from './workflows/song-score-download'
+include {songScoreUpload} from './workflows/song-score-upload'
+include {getSampleId; prepareFastqPair} from './modules/utils'
+
 
 if (params.help){
     printHelp()
@@ -71,11 +75,22 @@ if ( ! params.prefix ) {
 
 // main workflow
 workflow {
+   // TODO: download from SONG/SCORE
+   dnld(params.study_id, params.analysis_id)
+   analysis_metadata = dnld.out.song_analysis
+   sequencing_files = dnld.out.files
+
+   getSampleId(analysis_metadata)
+   prepareFastqPair(getSampleId.out, sequencing_files)
+
    if ( params.illumina ) {
        if (params.cram) {
            Channel.fromPath( "${params.directory}/**.cram" )
                   .map { file -> tuple(file.baseName, file) }
                   .set{ ch_cramFiles }
+       }
+       else if (params.analysis_id) {
+           ch_filePairs = prepareFastqPair.out
        }
        else {
 	   Channel.fromFilePairs( params.fastqSearchPath, flat: true)
@@ -104,18 +119,34 @@ workflow {
    }
 
    main:
+     results = Channel.empty()
+
      if ( params.nanopolish || params.medaka ) {
          articNcovNanopore(ch_fastqDirs)
+         results = articNcovNanopore.out  // TODO: define emits in articNcovNanopore
      } else if ( params.illumina ) {
          if ( params.cram ) {
             ncovIlluminaCram(ch_cramFiles)
+            results = ncovIlluminaCram.out  // TODO: define emits in ncovIlluminaCram
          }
          else {
             ncovIllumina(ch_filePairs)
+            results = ncovIllumina.out
          }
      } else {
          println("Please select a workflow with --nanopolish, --illumina or --medaka")
      }
      
+    // upload results
+    // TODO: prepare SONG metadata
+
+    // TODO: upload to SONG/SCORE
+
+   publish:  // this is mainly for testing. All results upload to SONG/SCORE no need for publish
+      results.qc_pass to: "${params.outdir}"
+      results.sorted_aligned_bam to: "${params.outdir}"
+      results.variants to: "${params.outdir}"
+      results.consensus_fa to: "${params.outdir}"
+
 }
 
