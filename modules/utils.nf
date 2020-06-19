@@ -10,8 +10,8 @@ process prepareFastqPair {
         """
         mkdir indir
         mv *.fastq.gz indir
-        ls indir/*_R1{,_001}.fastq.gz 2>/dev/null |xargs -I {} ln -s {} ${sampleId}_R1.fastq.gz || true
-        ls indir/*_R2{,_001}.fastq.gz 2>/dev/null |xargs -I {} ln -s {} ${sampleId}_R2.fastq.gz || true
+        ls indir/*_{,R}1{,_001}.fastq.gz 2>/dev/null |xargs -I {} ln -s {} ${sampleId}_R1.fastq.gz || true
+        ls indir/*_{,R}2{,_001}.fastq.gz 2>/dev/null |xargs -I {} ln -s {} ${sampleId}_R2.fastq.gz || true
         """
 }
 
