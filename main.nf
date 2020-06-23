@@ -12,7 +12,7 @@ include {ncovIllumina} from './workflows/illuminaNcovExt.nf'
 include {ncovIlluminaCram} from './workflows/illuminaNcovExt.nf'
 include {songScoreDownload as dnld} from './workflows/song-score-download'
 include {songScoreUpload} from './workflows/song-score-upload'
-include {getSampleId; prepareFastqPair; performHostFilter} from './modules/utils'
+include {getSampleId; prepareFastqPair; performHostFilter; getSecondaryFiles} from './modules/utils'
 
 
 if (params.help){
@@ -85,7 +85,14 @@ workflow {
 
 
    if ( params.illumina ) {
-       performHostFilter(prepareFastqPair.out)
+       performHostFilter(
+          prepareFastqPair.out,
+          file(params.human_ref),
+          Channel.fromPath(
+             getSecondaryFiles(params.human_ref, ['amb', 'ann', 'bwt', 'pac', 'sa']),
+             checkIfExists: true
+          ).collect()
+       )
 
        if (params.cram) {
            Channel.fromPath( "${params.directory}/**.cram" )
